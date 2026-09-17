@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Netflix Content Analysis</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg-0:#0a0e17;
+    --bg-1:#0f1524;
+    --panel:#141b2d;
+    --panel-border:#232c42;
+    --accent:#e50914;
+    --accent-glow:rgba(229,9,20,0.35);
+    --text-hi:#f2f4fa;
+    --text-mid:#9aa4bd;
+    --text-low:#5c6684;
+    --grid:#1f273c;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:
+      radial-gradient(1200px 500px at 15% -10%, rgba(229,9,20,0.10), transparent 60%),
+      radial-gradient(900px 500px at 100% 0%, rgba(60,90,220,0.08), transparent 55%),
+      var(--bg-0);
+    color:var(--text-hi);
+    font-family:'Segoe UI', Inter, system-ui, sans-serif;
+    padding:22px;
+    min-height:100vh;
+  }
+  .header{
+    text-align:center;
+    padding:6px 0 20px;
+    position:relative;
+  }
+  .header h1{
+    margin:0;
+    font-size:30px;
+    font-weight:800;
+    letter-spacing:3px;
+    background:linear-gradient(180deg,#ffffff 0%, #b9c2da 100%);
+    -webkit-background-clip:text;
+    background-clip:text;
+    color:transparent;
+  }
+  .header .sub{
+    color:var(--text-mid);
+    font-size:12px;
+    letter-spacing:2px;
+    margin-top:4px;
+    text-transform:uppercase;
+  }
+  .header::after{
+    content:"";
+    display:block;
+    width:120px;height:3px;margin:14px auto 0;
+    background:linear-gradient(90deg, transparent, var(--accent), transparent);
+    border-radius:2px;
+  }
+
+  .kpi-row{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:14px;
+    margin-bottom:14px;
+  }
+  .kpi{
+    background:linear-gradient(180deg, var(--panel), var(--bg-1));
+    border:1px solid var(--panel-border);
+    border-radius:10px;
+    padding:14px 18px;
+    text-align:center;
+    position:relative;
+    overflow:hidden;
+  }
+  .kpi::before{
+    content:"";
+    position:absolute; inset:0 0 auto 0; height:2px;
+    background:linear-gradient(90deg, transparent, var(--accent), transparent);
+  }
+  .kpi .label{
+    font-size:11px; letter-spacing:1.5px; color:var(--text-mid); text-transform:uppercase;
+  }
+  .kpi .value{
+    font-size:26px; font-weight:800; color:#4ee08a; margin-top:4px;
+    text-shadow:0 0 18px rgba(78,224,138,0.35);
+  }
+  .kpi.movies .value{color:var(--accent); text-shadow:0 0 18px var(--accent-glow);}
+
+  .layout{
+    display:grid;
+    grid-template-columns:200px 1fr;
+    gap:14px;
+  }
+
+  .sidebar{
+    background:linear-gradient(180deg, var(--panel), var(--bg-1));
+    border:1px solid var(--panel-border);
+    border-radius:10px;
+    padding:14px;
+    height:fit-content;
+  }
+  .filter-group{margin-bottom:16px;}
+  .filter-group label{
+    display:block; font-size:11px; letter-spacing:1px; text-transform:uppercase;
+    color:var(--text-mid); margin-bottom:6px;
+  }
+  .filter-group select{
+    width:100%;
+    background:var(--bg-1);
+    color:var(--text-hi);
+    border:1px solid var(--panel-border);
+    border-radius:6px;
+    padding:7px 8px;
+    font-size:13px;
+  }
+  .filter-group select:focus{outline:1px solid var(--accent);}
+
+  .grid{
+    display:grid;
+    grid-template-columns:1.3fr 1fr;
+    grid-template-rows:auto auto;
+    gap:14px;
+  }
+  .panel{
+    background:linear-gradient(180deg, var(--panel), var(--bg-1));
+    border:1px solid var(--panel-border);
+    border-radius:10px;
+    padding:14px 16px 10px;
+    position:relative;
+  }
+  .panel h3{
+    margin:0 0 8px;
+    font-size:13px;
+    font-weight:600;
+    color:var(--text-hi);
+    letter-spacing:0.3px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .panel h3::before{
+    content:"";
+    width:5px; height:5px; border-radius:50%;
+    background:var(--accent);
+    box-shadow:0 0 8px var(--accent);
+  }
+  .chart-wrap{position:relative; height:190px;}
+  .chart-wrap.tall{height:210px;}
+
+  .top5-list{list-style:none; margin:6px 0 0; padding:0;}
+  .top5-list li{
+    display:grid; grid-template-columns:20px 1fr 40px; align-items:center; gap:8px;
+    font-size:12px; color:var(--text-mid); padding:5px 0;
+  }
+  .top5-list li .rank{color:var(--text-low); font-weight:700;}
+  .top5-list li .bar-bg{
+    background:var(--grid); border-radius:4px; height:8px; overflow:hidden;
+  }
+  .top5-list li .bar-fill{
+    height:100%; background:linear-gradient(90deg,#7a0a0f,var(--accent));
+    border-radius:4px;
+  }
+  .top5-list li .num{color:var(--text-hi); font-weight:600; text-align:right;}
+  .top5-list li .name{color:var(--text-hi);}
+
+  .footer-note{
+    text-align:center; color:var(--text-low); font-size:11px; margin-top:16px; letter-spacing:0.5px;
+  }
+
+  @media (max-width:900px){
+    .layout{grid-template-columns:1fr;}
+    .grid{grid-template-columns:1fr;}
+    .kpi-row{grid-template-columns:1fr 1fr;}
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>NETFLIX CONTENT ANALYSIS</h1>
+  <div class="sub">Catalog · Genre · Country breakdown — 8,790 titles</div>
+</div>
+
+<div class="kpi-row">
+  <div class="kpi movies"><div class="label">Movies</div><div class="value" id="kpiMovies">0</div></div>
+  <div class="kpi"><div class="label">TV Shows</div><div class="value" id="kpiTv">0</div></div>
+  <div class="kpi"><div class="label">Countries</div><div class="value" id="kpiCountries">0</div></div>
+  <div class="kpi"><div class="label">Total Titles</div><div class="value" id="kpiTotal">0</div></div>
+</div>
+
+<div class="layout">
+  <div class="sidebar">
+    <div class="filter-group">
+      <label>Country</label>
+      <select id="countrySelect"></select>
+    </div>
+    <div class="filter-group">
+      <label>Year (from)</label>
+      <select id="yearSelect"></select>
+    </div>
+    <div class="filter-group">
+      <label>Compare With</label>
+      <select id="compareSelect"></select>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="panel">
+      <h3 id="genreTitle">Genre Popularity — United States</h3>
+      <div class="chart-wrap"><canvas id="genreChart"></canvas></div>
+    </div>
+    <div class="panel">
+      <h3>Movie vs TV Show Mix by Country</h3>
+      <div class="chart-wrap"><canvas id="mixChart"></canvas></div>
+    </div>
+    <div class="panel">
+      <h3 id="trendTitle">Content Additions Over Time</h3>
+      <div class="chart-wrap tall"><canvas id="trendChart"></canvas></div>
+    </div>
+    <div class="panel">
+      <h3>Top 5 Genres — Overall Catalog</h3>
+      <ul class="top5-list" id="top5List"></ul>
+    </div>
+  </div>
+</div>
+
+<div class="footer-note">Netflix Movies &amp; TV Shows dataset · Python (Pandas) cleaning + SQL aggregation · Sandy's Data Analysis Project</div>
+
+<script>
+const DATA = {"top_countries": ["United States", "India", "United Kingdom", "Canada", "Japan", "France"], "years": [2015, 2016, 2017, 2018, 2019, 2020, 2021], "genre_by_country": {"United States": {"Documentaries": 429, "Dramas": 429, "Comedies": 374, "Action & Adventure": 323, "Children & Family Movies": 320, "Stand-Up Comedy": 210}, "India": {"Dramas": 404, "Comedies": 267, "Action & Adventure": 130, "International TV Shows": 48, "International Movies": 38, "Horror Movies": 30}, "United Kingdom": {"British TV Shows": 215, "Documentaries": 102, "Dramas": 99, "Action & Adventure": 52, "Comedies": 40, "Children & Family Movies": 20}, "Canada": {"Children & Family Movies": 39, "Dramas": 37, "Documentaries": 33, "Kids' TV": 31, "Comedies": 31, "Horror Movies": 17}, "Japan": {"Anime Series": 134, "Action & Adventure": 49, "International TV Shows": 31, "Anime Features": 17, "Dramas": 10, "Crime TV Shows": 4}, "France": {"Dramas": 52, "Comedies": 26, "Action & Adventure": 24, "Kids' TV": 24, "Documentaries": 22, "International TV Shows": 19}}, "trend_by_country": {"United States": [54, 177, 403, 502, 768, 710, 540], "India": [0, 11, 153, 339, 212, 193, 100], "United Kingdom": [4, 45, 120, 116, 155, 107, 77], "Canada": [5, 21, 50, 49, 53, 64, 27], "Japan": [1, 17, 30, 38, 59, 67, 45], "France": [4, 16, 30, 34, 45, 56, 27]}, "country_totals": {"United States": 3202, "India": 1008, "United Kingdom": 627, "Canada": 271, "Japan": 257, "France": 212}, "type_by_country": {"United States": {"Movie": 2361, "TV Show": 841}, "India": {"Movie": 927, "TV Show": 81}, "United Kingdom": {"Movie": 382, "TV Show": 245}, "Canada": {"Movie": 187, "TV Show": 84}, "Japan": {"Movie": 85, "TV Show": 172}, "France": {"Movie": 148, "TV Show": 64}}, "kpi": {"total": 8790, "movies": 6126, "tv_shows": 2664, "countries": 85}, "top_genres_overall": {"Dramas": 1599, "Comedies": 1210, "Action & Adventure": 859, "Documentaries": 829, "International TV Shows": 773}};
+
+const ACCENT = '#e50914';
+const GREEN = '#4ee08a';
+const GRID_COLOR = 'rgba(255,255,255,0.06)';
+const TEXT_MID = '#9aa4bd';
+
+Chart.defaults.color = TEXT_MID;
+Chart.defaults.font.family = "'Segoe UI', Inter, sans-serif";
+Chart.defaults.font.size = 11;
+
+// KPIs (animated count-up)
+function countUp(el, target){
+  let cur = 0; const step = Math.max(1, Math.round(target/40));
+  const t = setInterval(()=>{
+    cur += step;
+    if(cur >= target){cur = target; clearInterval(t);}
+    el.textContent = cur.toLocaleString();
+  }, 16);
+}
+countUp(document.getElementById('kpiMovies'), DATA.kpi.movies);
+countUp(document.getElementById('kpiTv'), DATA.kpi.tv_shows);
+countUp(document.getElementById('kpiCountries'), DATA.kpi.countries);
+countUp(document.getElementById('kpiTotal'), DATA.kpi.total);
+
+// Populate filters
+const countrySelect = document.getElementById('countrySelect');
+const compareSelect = document.getElementById('compareSelect');
+const yearSelect = document.getElementById('yearSelect');
+DATA.top_countries.forEach(c=>{
+  countrySelect.innerHTML += `<option value="${c}">${c}</option>`;
+  compareSelect.innerHTML += `<option value="${c}">${c}</option>`;
+});
+compareSelect.value = DATA.top_countries[1];
+DATA.years.forEach(y=>{ yearSelect.innerHTML += `<option value="${y}">${y}</option>`; });
+yearSelect.value = DATA.years[0];
+
+// Genre chart (horizontal bar)
+const genreCtx = document.getElementById('genreChart');
+let genreChart = new Chart(genreCtx, {
+  type:'bar',
+  data:{labels:[], datasets:[{data:[], backgroundColor:ACCENT, borderRadius:4, barThickness:14}]},
+  options:{
+    indexAxis:'y',
+    responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{display:false}},
+    scales:{
+      x:{grid:{color:GRID_COLOR}, ticks:{font:{size:10}}},
+      y:{grid:{display:false}, ticks:{font:{size:10}}}
+    }
+  }
+});
+
+// Mix chart (stacked bar Movie/TV)
+const mixCtx = document.getElementById('mixChart');
+let mixChart = new Chart(mixCtx, {
+  type:'bar',
+  data:{
+    labels: DATA.top_countries,
+    datasets:[
+      {label:'Movies', data:DATA.top_countries.map(c=>DATA.type_by_country[c].Movie), backgroundColor:ACCENT, borderRadius:3},
+      {label:'TV Shows', data:DATA.top_countries.map(c=>DATA.type_by_country[c]['TV Show']), backgroundColor:'#3a4568', borderRadius:3}
+    ]
+  },
+  options:{
+    responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{position:'top', labels:{boxWidth:10, font:{size:10}}}},
+    scales:{
+      x:{stacked:true, grid:{display:false}, ticks:{font:{size:9}}},
+      y:{stacked:true, grid:{color:GRID_COLOR}, ticks:{font:{size:9}}}
+    }
+  }
+});
+
+// Trend chart (line, two countries)
+const trendCtx = document.getElementById('trendChart');
+let trendChart = new Chart(trendCtx, {
+  type:'line',
+  data:{
+    labels: DATA.years,
+    datasets:[
+      {label:'', data:[], borderColor:ACCENT, backgroundColor:'rgba(229,9,20,0.15)', fill:true, tension:0.35, pointRadius:3, pointBackgroundColor:ACCENT},
+      {label:'', data:[], borderColor:'#4a90ff', backgroundColor:'rgba(74,144,255,0.10)', fill:true, tension:0.35, pointRadius:3, pointBackgroundColor:'#4a90ff'}
+    ]
+  },
+  options:{
+    responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{position:'top', labels:{boxWidth:10, font:{size:10}}}},
+    scales:{
+      x:{grid:{display:false}, ticks:{font:{size:10}}},
+      y:{grid:{color:GRID_COLOR}, ticks:{font:{size:10}}}
+    }
+  }
+});
+
+// Top 5 genres overall (static list, styled bars)
+const top5List = document.getElementById('top5List');
+const genresArr = Object.entries(DATA.top_genres_overall);
+const maxG = Math.max(...genresArr.map(g=>g[1]));
+genresArr.forEach((g,i)=>{
+  const pct = (g[1]/maxG*100).toFixed(0);
+  top5List.innerHTML += `
+    <li>
+      <span class="rank">${i+1}</span>
+      <span>
+        <span class="name">${g[0]}</span>
+        <div class="bar-bg"><div class="bar-fill" style="width:${pct}%"></div></div>
+      </span>
+      <span class="num">${g[1]}</span>
+    </li>`;
+});
+
+function updateDashboard(){
+  const country = countrySelect.value;
+  const compare = compareSelect.value;
+  const fromYear = parseInt(yearSelect.value);
+
+  document.getElementById('genreTitle').textContent = `Genre Popularity — ${country}`;
+  document.getElementById('trendTitle').textContent = `Content Additions Over Time — ${country} vs ${compare}`;
+
+  const genreData = DATA.genre_by_country[country];
+  genreChart.data.labels = Object.keys(genreData);
+  genreChart.data.datasets[0].data = Object.values(genreData);
+  genreChart.update();
+
+  const yearIdx = DATA.years.indexOf(fromYear);
+  const yrs = DATA.years.slice(yearIdx);
+  trendChart.data.labels = yrs;
+  trendChart.data.datasets[0].label = country;
+  trendChart.data.datasets[0].data = DATA.trend_by_country[country].slice(yearIdx);
+  trendChart.data.datasets[1].label = compare;
+  trendChart.data.datasets[1].data = DATA.trend_by_country[compare].slice(yearIdx);
+  trendChart.update();
+}
+
+countrySelect.addEventListener('change', updateDashboard);
+compareSelect.addEventListener('change', updateDashboard);
+yearSelect.addEventListener('change', updateDashboard);
+
+countrySelect.value = 'United States';
+updateDashboard();
+</script>
+</body>
+</html>

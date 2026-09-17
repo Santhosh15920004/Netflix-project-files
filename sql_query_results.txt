@@ -1,0 +1,104 @@
+=== 1. Top 10 genres by title count ===
+
+    SELECT primary_genre, COUNT(*) AS title_count
+    FROM netflix
+    GROUP BY primary_genre
+    ORDER BY title_count DESC
+    LIMIT 10;
+
+           primary_genre  title_count
+                  Dramas         1599
+                Comedies         1210
+      Action & Adventure          859
+           Documentaries          829
+  International TV Shows          773
+Children & Family Movies          605
+          Crime TV Shows          399
+                Kids' TV          385
+         Stand-Up Comedy          334
+           Horror Movies          275
+
+=== 2. Year-over-year content growth ===
+
+    SELECT year_added, COUNT(*) AS titles_added
+    FROM netflix
+    GROUP BY year_added
+    ORDER BY year_added;
+
+ year_added  titles_added
+       2008             2
+       2009             2
+       2010             1
+       2011            13
+       2012             3
+       2013            11
+       2014            24
+       2015            82
+       2016           426
+       2017          1185
+       2018          1648
+       2019          2016
+       2020          1879
+       2021          1498
+
+=== 3. Average movie duration by rating (Movies only) ===
+
+    SELECT rating, ROUND(AVG(duration_value), 1) AS avg_minutes, COUNT(*) AS movie_count
+    FROM netflix
+    WHERE type = 'Movie'
+    GROUP BY rating
+    HAVING movie_count >= 20
+    ORDER BY avg_minutes DESC;
+
+rating  avg_minutes  movie_count
+ TV-14        110.3         1427
+ PG-13        108.3          490
+     R        106.7          797
+    PG         98.3          287
+ TV-MA         95.9         2062
+ TV-PG         94.9          540
+    NR         94.5           75
+     G         90.3           41
+  TV-G         79.7          126
+ TV-Y7         66.3          139
+  TV-Y         48.1          131
+
+=== 4. Top 5 countries producing TV Shows ===
+
+    SELECT primary_country, COUNT(*) AS show_count
+    FROM netflix
+    WHERE type = 'TV Show' AND primary_country != 'Unknown'
+    GROUP BY primary_country
+    ORDER BY show_count DESC
+    LIMIT 5;
+
+primary_country  show_count
+  United States         841
+ United Kingdom         245
+          Japan         172
+    South Korea         164
+         Canada          84
+
+=== 5. Content mix (Movie vs TV Show) by top 5 countries ===
+
+    SELECT primary_country,
+           SUM(CASE WHEN type='Movie' THEN 1 ELSE 0 END) AS movies,
+           SUM(CASE WHEN type='TV Show' THEN 1 ELSE 0 END) AS tv_shows
+    FROM netflix
+    WHERE primary_country IN (
+        SELECT primary_country FROM netflix
+        WHERE primary_country != 'Unknown'
+        GROUP BY primary_country
+        ORDER BY COUNT(*) DESC
+        LIMIT 5
+    )
+    GROUP BY primary_country
+    ORDER BY (movies + tv_shows) DESC;
+
+primary_country  movies  tv_shows
+  United States    2361       841
+          India     927        81
+ United Kingdom     382       245
+         Canada     187        84
+          Japan      85       172
+
